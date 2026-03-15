@@ -10,7 +10,7 @@ from typing import Any
 
 Document: Any  # provided by Hopper's script engine at runtime
 
-VERSION = "1.5.1"
+VERSION = "1.5.2"
 
 
 # ---------------------------------------------------------------------------

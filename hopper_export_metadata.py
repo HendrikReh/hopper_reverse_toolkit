@@ -10,7 +10,7 @@ from typing import Any
 
 Document: Any  # provided by Hopper's script engine at runtime
 
-VERSION = "1.5.1"
+VERSION = "1.5.2"
 
 
 # ---------------------------------------------------------------------------
@@ -39,9 +39,18 @@ def default_output_path(
 
 
 def ensure_document_ready(document: Any) -> None:
+    """Check that background analysis has finished.
+
+    NOTE: waitForBackgroundProcessToEnd() dispatches to the main thread.
+    If analysis is still running, log a warning instead of blocking
+    (which would deadlock the Python thread against the main thread GIL).
+    """
     try:
         if document.backgroundProcessActive():
-            document.waitForBackgroundProcessToEnd()
+            document.log(
+                "[hopper_export_metadata] Warning: background analysis still active — "
+                "export may be incomplete. Wait for analysis to finish, then re-run."
+            )
     except AttributeError:
         return
 
@@ -283,12 +292,10 @@ def collect_metadata(document: Any) -> dict[str, Any]:
                 "basic_block_count": len(basic_blocks),
                 "basic_blocks": basic_blocks,
             }
-            try:
-                pseudocode = proc.decompile()
-            except Exception:
-                pseudocode = None
-            if pseudocode:
-                procedure_info["pseudocode"] = safe_name(pseudocode, "")
+            # NOTE: proc.decompile() is intentionally skipped in batch export.
+            # It dispatches to the main thread via _dispatch_sync_f_slow, which
+            # deadlocks when the main thread is waiting on the Python GIL.
+            # Use the MCP server's decompile_procedure() for individual procedures.
             result["procedures"].append(procedure_info)
     except Exception as error:
         warnings.append(f"Procedure parsing failed: {error}")

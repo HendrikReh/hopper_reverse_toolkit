@@ -10,7 +10,7 @@ from typing import Any
 
 Document: Any  # provided by Hopper's script engine at runtime
 
-VERSION = "1.5.1"
+VERSION = "1.5.2"
 
 CALL_TYPE_NAMES: dict[int, str] = {
     0: "none",
@@ -46,9 +46,18 @@ def default_output_path(
 
 
 def ensure_document_ready(document: Any) -> None:
+    """Check that background analysis has finished.
+
+    NOTE: waitForBackgroundProcessToEnd() dispatches to the main thread.
+    If analysis is still running, log a warning instead of blocking
+    (which would deadlock the Python thread against the main thread GIL).
+    """
     try:
         if document.backgroundProcessActive():
-            document.waitForBackgroundProcessToEnd()
+            document.log(
+                "[hopper_export_callgraph] Warning: background analysis still active — "
+                "export may be incomplete. Wait for analysis to finish, then re-run."
+            )
     except AttributeError:
         return
 

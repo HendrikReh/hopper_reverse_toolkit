@@ -1,10 +1,10 @@
 # Hopper Reverse Toolkit
 
-[![GitHub release](https://img.shields.io/github/v/release/HendrikReh/hopper_reverse_toolkit)](https://github.com/HendrikReh/hopper_reverse_toolkit/releases/tag/v1.5.1)
+[![GitHub release](https://img.shields.io/github/v/release/HendrikReh/hopper_reverse_toolkit)](https://github.com/HendrikReh/hopper_reverse_toolkit/releases/tag/v1.5.2)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org)
 [![Hopper](https://img.shields.io/badge/Hopper-v6-orange)](https://www.hopperapp.com/)
 
-**Version**: 1.5.1
+**Version**: 1.5.2
 **Last updated**: 2026-03-15
 **Maintained by**: <hendrik.reh@blacksmith-consulting.ai>
 
@@ -42,17 +42,17 @@ For Hopper scripting details beyond the toolkit workflow, see [`docs/hopper_6_2_
 
 | File | Version | Purpose |
 |---|---:|---|
-| `hopper_export_metadata.py` | 1.5.1 | Export segments, sections, strings, procedures, locals, tags, and CFG metadata from Hopper |
-| `hopper_export_callgraph.py` | 1.5.1 | Export a procedure call graph with call-site and call-type metadata |
-| `hopper_export_rust_analysis.py` | 1.5.1 | Export Rust-oriented function data with demangling, signatures, and call metadata |
-| `hopper_apply_annotations.py` | 1.5.1 | Apply labels, comments, tags, colors, and bookmarks back into the current Hopper document |
-| `enrich_hopper_exports.py` | 1.5.1 | Merge Hopper exports into enriched JSON while preserving richer call metadata |
+| `hopper_export_metadata.py` | 1.5.2 | Export segments, sections, strings, procedures, locals, tags, and CFG metadata from Hopper |
+| `hopper_export_callgraph.py` | 1.5.2 | Export a procedure call graph with call-site and call-type metadata |
+| `hopper_export_rust_analysis.py` | 1.5.2 | Export Rust-oriented function data with demangling, signatures, and call metadata |
+| `hopper_apply_annotations.py` | 1.5.2 | Apply labels, comments, tags, colors, and bookmarks back into the current Hopper document |
+| `enrich_hopper_exports.py` | 1.5.2 | Merge Hopper exports into enriched JSON while preserving richer call metadata |
 | `docs/hopper_6_2_1_python_api.md` | n/a | Practical plus reference guide for Hopper 6.2.1 Python scripting |
 | `export_graphml.py` | 1.4.0 | Convert `*.callgraph.json` into GraphML |
 | `generate_mermaid.py` | 1.4.0 | Generate subsystem, hotspot, and callflow Mermaid diagrams |
 | `json_to_mermaid_architecture.py` | 1.4.0 | Synthesize a higher-level Mermaid architecture diagram |
 | `generate_c4_architecture.py` | 1.4.0 | Generate C4-style Mermaid and PlantUML diagrams from enriched JSON |
-| `prompt_pack/` | 1.5.1 | Reusable prompts for architecture reconstruction, security triage, flow mapping, and annotation generation |
+| `prompt_pack/` | 1.5.2 | Reusable prompts for architecture reconstruction, security triage, flow mapping, and annotation generation |
 | `CHANGELOG.md` | n/a | Bundle history |
 | `README.md` | n/a | This document |
 
