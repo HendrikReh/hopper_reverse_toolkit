@@ -28,24 +28,15 @@ The most important consequence is this:
 Inside Hopper, scripts normally import directly from `hopper`:
 
 ```python
-from hopper import Document
+document = Document.getCurrentDocument()
+if document is None:
+    print("No active Hopper document.")
+    raise SystemExit(1)
 
+if document.backgroundProcessActive():
+    document.waitForBackgroundProcessToEnd()
 
-def main() -> int:
-    document = Document.getCurrentDocument()
-    if document is None:
-        print("No active Hopper document.")
-        return 1
-
-    if document.backgroundProcessActive():
-        document.waitForBackgroundProcessToEnd()
-
-    print("Loaded:", document.getDocumentName())
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+print("Loaded:", document.getDocumentName())
 ```
 
 If you want the same script to fail cleanly outside Hopper, guard the import:
@@ -96,9 +87,14 @@ That pattern matters. Exporting too early can silently miss procedures, labels, 
 ### 4.1 Enumerate segments and sections
 
 ```python
-from hopper import Document
-
 document = Document.getCurrentDocument()
+if document is None:
+    print("No active Hopper document.")
+    raise SystemExit(1)
+
+if document.backgroundProcessActive():
+    document.waitForBackgroundProcessToEnd()
+
 for segment in document.getSegmentsList():
     print(
         segment.getName(),
@@ -130,9 +126,6 @@ Important segment helpers:
 Prefer segment-based procedure enumeration. It stays on the documented public API:
 
 ```python
-from hopper import Document
-
-
 def iter_procedures(document):
     for segment in document.getSegmentsList():
         count = segment.getProcedureCount()
@@ -143,6 +136,13 @@ def iter_procedures(document):
 
 
 document = Document.getCurrentDocument()
+if document is None:
+    print("No active Hopper document.")
+    raise SystemExit(1)
+
+if document.backgroundProcessActive():
+    document.waitForBackgroundProcessToEnd()
+
 for procedure in iter_procedures(document):
     entry = procedure.getEntryPoint()
     name = document.getNameAtAddress(entry) or hex(entry)
@@ -154,6 +154,14 @@ This is better than relying on undocumented shortcuts from old scripts.
 ### 4.3 Walk basic blocks and control flow
 
 ```python
+document = Document.getCurrentDocument()
+if document is None:
+    print("No active Hopper document.")
+    raise SystemExit(1)
+
+if document.backgroundProcessActive():
+    document.waitForBackgroundProcessToEnd()
+
 entry = document.getEntryPoint()
 segment = document.getSegmentAtAddress(entry)
 procedure = segment.getProcedureAtAddress(entry)
@@ -176,6 +184,23 @@ Use this when you need:
 `Procedure.getAllCallees()` and `Procedure.getAllCallers()` return `CallReference` objects. Those objects preserve both the callsite and the referenced destination.
 
 ```python
+def iter_procedures(document):
+    for segment in document.getSegmentsList():
+        count = segment.getProcedureCount()
+        for index in range(count):
+            procedure = segment.getProcedureAtIndex(index)
+            if procedure is not None:
+                yield procedure
+
+
+document = Document.getCurrentDocument()
+if document is None:
+    print("No active Hopper document.")
+    raise SystemExit(1)
+
+if document.backgroundProcessActive():
+    document.waitForBackgroundProcessToEnd()
+
 for procedure in iter_procedures(document):
     caller_entry = procedure.getEntryPoint()
     caller_name = document.getNameAtAddress(caller_entry) or hex(caller_entry)
@@ -205,6 +230,14 @@ Call reference types are documented as:
 The public API supports both annotation export and annotation write-back.
 
 ```python
+document = Document.getCurrentDocument()
+if document is None:
+    print("No active Hopper document.")
+    raise SystemExit(1)
+
+if document.backgroundProcessActive():
+    document.waitForBackgroundProcessToEnd()
+
 address = document.getEntryPoint()
 segment = document.getSegmentAtAddress(address)
 
@@ -232,6 +265,14 @@ Use:
 If you already know the address is inside a specific segment, use the segment APIs. If you want Hopper to resolve the containing segment for you, use the document APIs.
 
 ```python
+document = Document.getCurrentDocument()
+if document is None:
+    print("No active Hopper document.")
+    raise SystemExit(1)
+
+if document.backgroundProcessActive():
+    document.waitForBackgroundProcessToEnd()
+
 segment = document.getCurrentSegment()
 address = document.getCurrentAddress()
 
@@ -250,6 +291,14 @@ Many read methods return `False` on failure. Check the result instead of assumin
 You can script binary cleanup and recovery by changing Hopper's byte types:
 
 ```python
+document = Document.getCurrentDocument()
+if document is None:
+    print("No active Hopper document.")
+    raise SystemExit(1)
+
+if document.backgroundProcessActive():
+    document.waitForBackgroundProcessToEnd()
+
 segment = document.getCurrentSegment()
 address = document.getCurrentAddress()
 
@@ -276,9 +325,18 @@ ARM helpers:
 `Document.assemble(instr, address, syntax)` lets you assemble bytes for an instruction before writing them back.
 
 ```python
-bytes_out = document.assemble("nop", document.getCurrentAddress(), 0)
+document = Document.getCurrentDocument()
+if document is None:
+    print("No active Hopper document.")
+    raise SystemExit(1)
+
+if document.backgroundProcessActive():
+    document.waitForBackgroundProcessToEnd()
+
+address = document.getCurrentAddress()
+bytes_out = document.assemble("nop", address, 0)
 if bytes_out:
-    document.writeBytes(document.getCurrentAddress(), bytes_out)
+    document.writeBytes(address, bytes_out)
     document.refreshView()
 ```
 
@@ -291,12 +349,216 @@ For Intel syntax:
 After changing bytes, comments, labels, or analysis state, you can save the Hopper database and optionally produce a patched executable:
 
 ```python
+document = Document.getCurrentDocument()
+if document is None:
+    print("No active Hopper document.")
+    raise SystemExit(1)
+
+if document.backgroundProcessActive():
+    document.waitForBackgroundProcessToEnd()
+
 document.saveDocument()
 output = document.produceNewExecutable(remove_sig=False)
 print(output)
 ```
 
 For Mach-O targets, `remove_sig=True` can be useful when the original signature is no longer valid.
+
+### 4.10 Export procedure names to a text file
+
+Write one procedure name per line to a file next to the binary.
+
+```python
+from pathlib import Path
+
+document = Document.getCurrentDocument()
+if document is None:
+    print("No active Hopper document.")
+    raise SystemExit(1)
+
+if document.backgroundProcessActive():
+    document.waitForBackgroundProcessToEnd()
+
+output_path = Path(document.getExecutableFilePath() + ".procedures.txt")
+
+lines = []
+for segment in document.getSegmentsList():
+    for index in range(segment.getProcedureCount()):
+        procedure = segment.getProcedureAtIndex(index)
+        if procedure is not None:
+            entry = procedure.getEntryPoint()
+            name = document.getNameAtAddress(entry) or hex(entry)
+            lines.append(f"{hex(entry)}  {name}")
+
+output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+print(f"Exported {len(lines)} procedures to {output_path}")
+```
+
+### 4.11 Export strings to CSV
+
+Collect all strings across segments and write them as CSV.
+
+```python
+import csv
+import io
+from pathlib import Path
+
+document = Document.getCurrentDocument()
+if document is None:
+    print("No active Hopper document.")
+    raise SystemExit(1)
+
+if document.backgroundProcessActive():
+    document.waitForBackgroundProcessToEnd()
+
+output_path = Path(document.getExecutableFilePath() + ".strings.csv")
+
+buf = io.StringIO()
+writer = csv.writer(buf)
+writer.writerow(["segment", "address", "value"])
+
+count = 0
+for segment in document.getSegmentsList():
+    seg_name = segment.getName()
+    for text, address in segment.getStringsList():
+        writer.writerow([seg_name, hex(address), text])
+        count += 1
+
+output_path.write_text(buf.getvalue(), encoding="utf-8")
+print(f"Exported {count} strings to {output_path}")
+```
+
+### 4.12 Export procedure metadata to JSON
+
+Build a list of procedure records and write them as indented JSON.
+
+```python
+import json
+from pathlib import Path
+
+document = Document.getCurrentDocument()
+if document is None:
+    print("No active Hopper document.")
+    raise SystemExit(1)
+
+if document.backgroundProcessActive():
+    document.waitForBackgroundProcessToEnd()
+
+output_path = Path(document.getExecutableFilePath() + ".proc_meta.json")
+
+records = []
+for segment in document.getSegmentsList():
+    for index in range(segment.getProcedureCount()):
+        procedure = segment.getProcedureAtIndex(index)
+        if procedure is None:
+            continue
+        entry = procedure.getEntryPoint()
+        records.append({
+            "address": hex(entry),
+            "name": document.getNameAtAddress(entry) or "",
+            "signature": str(procedure.signatureString() or ""),
+            "basic_block_count": int(procedure.getBasicBlockCount()),
+            "segment": segment.getName(),
+        })
+
+output_path.write_text(json.dumps(records, indent=2) + "\n", encoding="utf-8")
+print(f"Exported {len(records)} procedures to {output_path}")
+```
+
+### 4.13 Export cross-references for a procedure
+
+Dump all callers and callees of the procedure at the current cursor position.
+
+```python
+import json
+from pathlib import Path
+
+document = Document.getCurrentDocument()
+if document is None:
+    print("No active Hopper document.")
+    raise SystemExit(1)
+
+if document.backgroundProcessActive():
+    document.waitForBackgroundProcessToEnd()
+
+procedure = document.getCurrentProcedure()
+if procedure is None:
+    print("No procedure at the current cursor position.")
+    raise SystemExit(1)
+
+entry = procedure.getEntryPoint()
+name = document.getNameAtAddress(entry) or hex(entry)
+
+callers = []
+for ref in procedure.getAllCallers():
+    callers.append({
+        "from": hex(ref.fromAddress()),
+        "to": hex(ref.toAddress()),
+        "type": int(ref.type()),
+    })
+
+callees = []
+for ref in procedure.getAllCallees():
+    callees.append({
+        "from": hex(ref.fromAddress()),
+        "to": hex(ref.toAddress()),
+        "type": int(ref.type()),
+    })
+
+result = {
+    "procedure": name,
+    "address": hex(entry),
+    "callers": callers,
+    "callees": callees,
+}
+
+output_path = Path(document.getExecutableFilePath() + f".xrefs_{hex(entry)}.json")
+output_path.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+print(f"Exported {len(callers)} callers and {len(callees)} callees to {output_path}")
+```
+
+### 4.14 Export segment layout to JSON
+
+Capture the full segment and section layout of the binary.
+
+```python
+import json
+from pathlib import Path
+
+document = Document.getCurrentDocument()
+if document is None:
+    print("No active Hopper document.")
+    raise SystemExit(1)
+
+if document.backgroundProcessActive():
+    document.waitForBackgroundProcessToEnd()
+
+output_path = Path(document.getExecutableFilePath() + ".segments.json")
+
+segments = []
+for segment in document.getSegmentsList():
+    sections = []
+    for section_index in range(segment.getSectionCount()):
+        section = segment.getSection(section_index)
+        sections.append({
+            "name": section.getName(),
+            "start": hex(section.getStartingAddress()),
+            "length": int(section.getLength()),
+            "flags": int(section.getFlags()),
+        })
+    segments.append({
+        "name": segment.getName(),
+        "start": hex(segment.getStartingAddress()),
+        "length": int(segment.getLength()),
+        "file_offset": int(segment.getFileOffset()),
+        "procedure_count": int(segment.getProcedureCount()),
+        "string_count": int(segment.getStringCount()),
+        "sections": sections,
+    })
+
+output_path.write_text(json.dumps(segments, indent=2) + "\n", encoding="utf-8")
+print(f"Exported {len(segments)} segments to {output_path}")
+```
 
 ## 5. API reference by class
 
