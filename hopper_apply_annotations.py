@@ -1,41 +1,51 @@
+# hopper_apply_annotations.py — run inside Hopper's script engine
+# Applies labels, comments, tags, colors, and bookmarks from a JSON file to the current document.
+
 from __future__ import annotations
 
-import argparse
 import json
 from pathlib import Path
 from typing import Any
 
-from _hopper_utils import load_json, parse_address, parse_color
+
+Document: Any  # provided by Hopper's script engine at runtime
+
+VERSION = "1.5.1"
 
 
-try:
-    from hopper import Document  # type: ignore[import-not-found]
+# ---------------------------------------------------------------------------
+# Utility helpers (inlined — no external module dependencies)
+# ---------------------------------------------------------------------------
 
-    HAS_HOPPER = True
-except ModuleNotFoundError:
-    Document = None
-    HAS_HOPPER = False
-
-
-VERSION = "1.5.0"
+def load_json(path: str | Path) -> Any:
+    return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Apply labels, comments, tags, colors, and bookmarks to the current Hopper document.",
-    )
-    parser.add_argument(
-        "annotations_json",
-        nargs="?",
-        help="Path to an annotations JSON payload. If omitted inside Hopper, a file picker is shown.",
-    )
-    return parser.parse_args()
+def parse_address(value: object) -> int:
+    if isinstance(value, int):
+        return value
+    text = str(value).strip().lower()
+    if text.startswith("0x"):
+        return int(text, 16)
+    return int(text, 10)
 
 
-def resolve_input_path(document: Any, path_arg: str | None) -> Path:
-    if path_arg:
-        return Path(path_arg)
+def parse_color(value: object) -> int:
+    if isinstance(value, int):
+        return value
+    text = str(value).strip().lower()
+    if text.startswith("#"):
+        text = text[1:]
+    if text.startswith("0x"):
+        text = text[2:]
+    return int(text, 16)
 
+
+# ---------------------------------------------------------------------------
+# Annotation logic
+# ---------------------------------------------------------------------------
+
+def resolve_input_path(document: Any) -> Path:
     try:
         executable_path = Path(document.getExecutableFilePath())
         start_dir = str(executable_path.parent)
@@ -98,30 +108,18 @@ def apply_annotations(document: Any, payload: dict[str, Any]) -> dict[str, int]:
     return summary
 
 
-def main() -> int:
-    if not HAS_HOPPER:
-        print("Hopper Python API is unavailable. Run this script inside Hopper.")
-        return 1
+# ---------------------------------------------------------------------------
+# Script entry — runs immediately inside Hopper
+# ---------------------------------------------------------------------------
 
-    document = Document.getCurrentDocument()
-    if document is None:
-        print("No active Hopper document.")
-        return 1
+doc = Document.getCurrentDocument()
+if doc is None:
+    raise RuntimeError("No active Hopper document.")
 
-    args = parse_args()
-    try:
-        input_path = resolve_input_path(document, args.annotations_json)
-        payload = load_json(input_path)
-        summary = apply_annotations(document, payload)
-    except (OSError, json.JSONDecodeError, RuntimeError, ValueError, KeyError) as error:
-        print(f"Failed to apply annotations: {error}")
-        return 1
+input_path = resolve_input_path(doc)
+payload = load_json(input_path)
+summary = apply_annotations(doc, payload)
 
-    print("Annotations applied from:", input_path)
-    for key, value in summary.items():
-        print(f"{key}: {value}")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+doc.log(f"[hopper_apply_annotations] Applied from: {input_path}")
+for key, value in summary.items():
+    doc.log(f"[hopper_apply_annotations]   {key}: {value}")

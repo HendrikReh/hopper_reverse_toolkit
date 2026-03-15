@@ -9,7 +9,7 @@ from typing import Any, Callable
 from _hopper_utils import demangle_rust_symbol, guess_subsystem, load_json, write_json, write_text
 
 
-VERSION = "1.5.0"
+VERSION = "1.5.1"
 INTERESTING_TOKENS = (
     "auth",
     "token",

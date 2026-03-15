@@ -1,29 +1,93 @@
+# hopper_export_metadata.py — run inside Hopper's script engine
+# Exports full document metadata (segments, symbols, procedures, CFG, pseudocode) to JSON.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
-from _hopper_utils import (
-    default_output_path,
-    ensure_document_ready,
-    iter_document_procedures,
-    tag_names,
-    to_hex,
-    write_json,
-)
+
+Document: Any  # provided by Hopper's script engine at runtime
+
+VERSION = "1.5.1"
 
 
-try:
-    from hopper import Document  # type: ignore[import-not-found]
+# ---------------------------------------------------------------------------
+# Utility helpers (inlined — no external module dependencies)
+# ---------------------------------------------------------------------------
 
-    HAS_HOPPER = True
-except ModuleNotFoundError:
-    Document = None
-    HAS_HOPPER = False
+def to_hex(value: object) -> str | None:
+    try:
+        return f"0x{int(value):x}"
+    except (TypeError, ValueError):
+        return None
 
 
-VERSION = "1.5.0"
+def write_json(path: str | Path, payload: Any) -> None:
+    Path(path).write_text(f"{json.dumps(payload, indent=2)}\n", encoding="utf-8")
+
+
+def default_output_path(
+    executable_path: str | None,
+    suffix: str,
+    fallback_name: str,
+) -> Path:
+    if executable_path:
+        return Path(f"{executable_path}{suffix}")
+    return Path.home() / fallback_name
+
+
+def ensure_document_ready(document: Any) -> None:
+    try:
+        if document.backgroundProcessActive():
+            document.waitForBackgroundProcessToEnd()
+    except AttributeError:
+        return
+
+
+def iter_document_procedures(document: Any) -> list[tuple[Any, Any]]:
+    """Yield (segment, procedure) pairs for all procedures in the document."""
+    results: list[tuple[Any, Any]] = []
+    for segment in document.getSegmentsList():
+        try:
+            count = int(segment.getProcedureCount())
+        except Exception:
+            continue
+        for index in range(count):
+            try:
+                procedure = segment.getProcedureAtIndex(index)
+            except Exception:
+                continue
+            if procedure is not None:
+                results.append((segment, procedure))
+    return results
+
+
+def procedure_name(segment: Any, procedure: Any) -> str:
+    """Get the name of a procedure via segment name lookup at its entry point."""
+    try:
+        entry = procedure.getEntryPoint()
+        name = segment.getNameAtAddress(entry)
+        if name:
+            return str(name)
+    except Exception:
+        pass
+    return ""
+
+
+def tag_names(owner: Any) -> list[str]:
+    try:
+        tags = owner.getTagList()
+    except Exception:
+        return []
+    names: list[str] = []
+    for tag in tags:
+        try:
+            names.append(str(tag.getName()))
+        except Exception:
+            continue
+    return names
 
 
 def safe_name(value: object, fallback: str = "") -> str:
@@ -31,6 +95,11 @@ def safe_name(value: object, fallback: str = "") -> str:
         return fallback if value is None else str(value)
     except Exception:
         return fallback
+
+
+# ---------------------------------------------------------------------------
+# Metadata collection
+# ---------------------------------------------------------------------------
 
 def basic_block_details(procedure: Any) -> list[dict[str, Any]]:
     basic_blocks: list[dict[str, Any]] = []
@@ -177,23 +246,45 @@ def collect_metadata(document: Any) -> dict[str, Any]:
         warnings.append(f"Segment parsing failed: {error}")
 
     try:
-        for procedure in iter_document_procedures(document):
-            basic_blocks = basic_block_details(procedure)
-            local_variables = local_variable_details(procedure)
-            procedure_info = {
-                "name": safe_name(procedure.getName(), ""),
-                "entry_point": to_hex(procedure.getEntryPoint()),
-                "start": to_hex(procedure.getStartingAddress()),
-                "end": to_hex(procedure.getEndingAddress()),
-                "signature": safe_name(procedure.signatureString(), ""),
-                "heap_size": int(procedure.getHeapSize()),
+        for seg, proc in iter_document_procedures(document):
+            try:
+                entry = to_hex(proc.getEntryPoint())
+            except Exception:
+                entry = None
+            try:
+                start = to_hex(proc.getStartingAddress())
+            except Exception:
+                start = entry
+            try:
+                end = to_hex(proc.getEndingAddress())
+            except Exception:
+                end = None
+            try:
+                signature = safe_name(proc.signatureString(), "")
+            except Exception:
+                signature = ""
+            try:
+                heap_size = int(proc.getHeapSize())
+            except Exception:
+                heap_size = 0
+
+            basic_blocks = basic_block_details(proc)
+            local_variables = local_variable_details(proc)
+
+            procedure_info: dict[str, Any] = {
+                "name": procedure_name(seg, proc),
+                "entry_point": entry,
+                "start": start,
+                "end": end,
+                "signature": signature,
+                "heap_size": heap_size,
                 "local_variables": local_variables,
-                "tags": tag_names(procedure),
+                "tags": tag_names(proc),
                 "basic_block_count": len(basic_blocks),
                 "basic_blocks": basic_blocks,
             }
             try:
-                pseudocode = procedure.decompile()
+                pseudocode = proc.decompile()
             except Exception:
                 pseudocode = None
             if pseudocode:
@@ -211,37 +302,25 @@ def collect_metadata(document: Any) -> dict[str, Any]:
     return result
 
 
-def export_hopper_metadata(document: Any | None = None) -> tuple[Path, dict[str, Any]]:
-    if not HAS_HOPPER and document is None:
-        raise RuntimeError("Hopper Python API is unavailable. Run this script inside Hopper.")
+# ---------------------------------------------------------------------------
+# Script entry — runs immediately inside Hopper
+# ---------------------------------------------------------------------------
 
-    active_document = document or Document.getCurrentDocument()
-    if active_document is None:
-        raise RuntimeError("No active Hopper document.")
+doc = Document.getCurrentDocument()
+if doc is None:
+    raise RuntimeError("No active Hopper document.")
 
-    ensure_document_ready(active_document)
-    result = collect_metadata(active_document)
-    output_path = default_output_path(
-        result["document"].get("file_path"),
-        ".hopper_export.json",
-        "hopper_export.json",
-    )
-    write_json(output_path, result)
-    return output_path, result
+ensure_document_ready(doc)
+result = collect_metadata(doc)
 
+output_path = default_output_path(
+    result["document"].get("file_path"),
+    ".hopper_export.json",
+    "hopper_export.json",
+)
+write_json(output_path, result)
 
-def main() -> int:
-    try:
-        output_path, result = export_hopper_metadata()
-    except RuntimeError as error:
-        print(error)
-        return 1
-
-    print("Export complete:", output_path)
-    if result.get("warnings"):
-        print(f"Warnings: {len(result['warnings'])}")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+doc.log(f"[hopper_export_metadata] Export complete: {output_path}")
+if result.get("warnings"):
+    for w in result["warnings"]:
+        doc.log(f"[hopper_export_metadata] Warning: {w}")
