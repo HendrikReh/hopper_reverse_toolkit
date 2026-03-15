@@ -1,7 +1,6 @@
 # Hopper Reverse Toolkit
 
 [![GitHub release](https://img.shields.io/github/v/release/HendrikReh/hopper_reverse_toolkit)](https://github.com/HendrikReh/hopper_reverse_toolkit/releases)
-[![License](https://img.shields.io/github/license/HendrikReh/hopper_reverse_toolkit)](https://github.com/HendrikReh/hopper_reverse_toolkit/blob/master/LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org)
 [![Hopper](https://img.shields.io/badge/Hopper-v6-orange)](https://www.hopperapp.com/)
 
