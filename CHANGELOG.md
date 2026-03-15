@@ -1,9 +1,6 @@
 
 # Changelog
 
-## Unreleased
-- Added `HOPPER_6_2_1_PYTHON_API.md`, a hybrid practical guide and class reference for Hopper 6.2.1 Python scripting.
-
 ## v1.5.2
 - Fixed deadlock in batch export: replaced `waitForBackgroundProcessToEnd()` with a non-blocking warning log to avoid deadlocking against the main-thread GIL.
 - Removed `proc.decompile()` from batch metadata export to prevent the same main-thread deadlock; use the MCP server's `decompile_procedure()` for individual procedures instead.
